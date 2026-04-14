@@ -1,5 +1,4 @@
 import { getStore } from "@netlify/blobs";
-import { getUser } from "@netlify/identity";
 
 function safeKey(s) {
   return String(s || "").replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -13,11 +12,11 @@ function json(data, status = 200) {
 }
 
 export default async (req, context) => {
-  const user = (await getUser().catch(() => null)) || context?.clientContext?.user || null;
+  const user = context?.clientContext?.user || null;
   if (!user) return new Response("Unauthorized", { status: 401 });
 
   const store = getStore({ name: "agenda-ale", consistency: "strong" });
-  const who = safeKey(user.id || user.email || "user");
+  const who = safeKey(user.sub || user.id || user.email || "user");
   const key = `state-v1-${who}`;
 
   try {
@@ -41,7 +40,6 @@ export default async (req, context) => {
       payload.updatedAt = new Date().toISOString();
       await store.setJSON(key, payload);
 
-      // Per il tuo backup giornaliero attuale va bene, perché stai lavorando con un solo admin
       await store.setJSON("owner-meta", {
         key,
         email: user.email || null,
