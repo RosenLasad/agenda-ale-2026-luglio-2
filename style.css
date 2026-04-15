@@ -2468,3 +2468,90 @@ body{
     justify-content:center;
   }
 }
+
+/* ===== Account / Login modal scroll fix ===== */
+
+/* L'overlay deve poter scorrere verticalmente */
+.overlay{
+  align-items: flex-start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px;
+}
+
+/* Il modal account deve stare dentro l'altezza visibile */
+.accountModal{
+  width: min(760px, 100%);
+  max-height: calc(100dvh - 24px);
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Header sempre visibile mentre scorri il contenuto */
+.accountModal .modalHeader{
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: inherit;
+}
+
+/* Il corpo del pannello deve scorrere */
+.accountModalBody{
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding-bottom: 24px;
+}
+
+/* Evita che elementi larghi rompano il layout */
+.accountModalBody,
+.accountModalBody *{
+  box-sizing: border-box;
+}
+
+.accountModalBody .row,
+.accountModalBody .actions,
+.accountModalBody .plans,
+.accountModalBody .planCard{
+  max-width: 100%;
+}
+
+/* Migliora i telefoni in orizzontale e schermi bassi */
+@media (max-height: 520px){
+  .overlay{
+    padding: 6px;
+  }
+
+  .accountModal{
+    max-height: calc(100dvh - 12px);
+    border-radius: 14px;
+  }
+
+  .accountModalBody{
+    padding-bottom: 18px;
+  }
+}
+
+/* Su schermi stretti, evita che i pulsanti si schiaccino male */
+@media (max-width: 640px){
+  .accountModal{
+    width: 100%;
+  }
+
+  .accountModalBody .actions,
+  .accountModalBody .plans{
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .accountModalBody button,
+  .accountModalBody .btn,
+  .accountModalBody .smallBtn{
+    width: 100%;
+  }
+}
