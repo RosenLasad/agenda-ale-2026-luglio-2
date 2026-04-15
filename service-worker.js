@@ -1,4 +1,5 @@
-const CACHE_NAME = "agenda-shell-v9";
+const CACHE_NAME = "agenda-shell-v10";
+
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -11,6 +12,14 @@ const APP_SHELL = [
   "./icons/icon-maskable-512.png",
   "./icons/apple-touch-icon.png"
 ];
+
+const NETWORK_FIRST_PATHS = new Set([
+  "/",
+  "/index.html",
+  "/app.js",
+  "/style.css",
+  "/manifest.webmanifest"
+]);
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -38,19 +47,32 @@ self.addEventListener("fetch", (event) => {
 
   if (request.method !== "GET") return;
   if (url.origin !== self.location.origin) return;
+
+  // Non toccare API o Identity/Netlify interni
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/.netlify/")) {
     return;
   }
 
-  if (request.mode === "navigate") {
+  const isNavigate = request.mode === "navigate";
+  const isNetworkFirstAsset = NETWORK_FIRST_PATHS.has(url.pathname);
+
+  if (isNavigate || isNetworkFirstAsset) {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put("./index.html", copy));
+          if (response && response.status === 200) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, copy);
+              if (isNavigate) cache.put("./index.html", response.clone());
+            });
+          }
           return response;
         })
-        .catch(() => caches.match("./index.html"))
+        .catch(async () => {
+          const cached = await caches.match(request);
+          return cached || caches.match("./index.html");
+        })
     );
     return;
   }
