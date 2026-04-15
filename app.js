@@ -2,7 +2,22 @@
     "use strict";
 
     var START_YEAR = 2026;
-    var STORAGE_KEY = "agenda_ale_2026_v1";
+    var STORAGE_KEY_BASE = "agenda_ale_2026_v1";
+    var API_ENDPOINT = "/.netlify/functions/agenda";
+
+    function safeStorageSuffix(s){
+      return String(s || "guest").replace(/[^a-zA-Z0-9_-]/g, "_");
+    }
+
+    function getActiveStorageKey(){
+      try{
+        var user = window.netlifyIdentity && window.netlifyIdentity.currentUser && window.netlifyIdentity.currentUser();
+        var raw = user ? (user.id || user.sub || user.email || "user") : "guest";
+        return STORAGE_KEY_BASE + "__" + safeStorageSuffix(raw);
+      }catch(e){
+        return STORAGE_KEY_BASE + "__guest";
+      }
+    }
 
     var MONTHS_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
     var DOW_IT = ["Lun","Mar","Mer","Gio","Ven","Sab","Dom"];
@@ -229,7 +244,7 @@
 
     function loadState(){
       try{
-        var raw = localStorage.getItem(STORAGE_KEY);
+        var raw = localStorage.getItem(getActiveStorageKey());
         if(!raw) return defaultState();
         var obj = JSON.parse(raw);
         if(!obj || typeof obj !== "object") return defaultState();
@@ -282,7 +297,7 @@
 
     async function loadRemoteState(){
       var authHeaders = await getIdentityAuthHeaders();
-      var res = await fetch("/api/agenda", {
+      var res = await fetch(API_ENDPOINT, {
         method:"GET",
         credentials:"same-origin",
         headers: authHeaders
@@ -295,7 +310,7 @@
 
     async function saveRemoteState(payload){
       var authHeaders = await getIdentityAuthHeaders();
-      var res = await fetch("/api/agenda", {
+      var res = await fetch(API_ENDPOINT, {
         method:"PUT",
         credentials:"same-origin",
         headers: Object.assign(
@@ -331,7 +346,7 @@
     function applyRemoteState(remote){
       if(!remote || typeof remote !== "object") return false;
       state = normalizeLoadedState(remote);
-      try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+      try{ localStorage.setItem(getActiveStorageKey(), JSON.stringify(state)); }catch(e){}
       syncNotesUiFromState();
       renderAll();
       updateStorageStatus(true);
@@ -1263,7 +1278,7 @@ if(openTodosBtn){
       if(saveTimer) clearTimeout(saveTimer);
       saveTimer = setTimeout(function(){
         try{
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          localStorage.setItem(getActiveStorageKey(), JSON.stringify(state));
           updateStorageStatus(true);
           // se loggato, salva anche online (debounce separato)
           if(isLoggedIn()) scheduleRemoteSave();
@@ -1276,12 +1291,19 @@ if(openTodosBtn){
     function updateStorageStatus(ok){
       if(!storageStatus) return;
       try{
-        var raw = localStorage.getItem(STORAGE_KEY) || "";
+        var raw = localStorage.getItem(getActiveStorageKey()) || "";
         var size = raw.length;
         storageStatus.textContent = (ok !== false ? "ok" : "errore") + " · " + Math.round(size/1024) + " KB";
       }catch(e){
         storageStatus.textContent = "errore storage";
       }
+    }
+
+    function switchStateForCurrentSession(){
+      state = loadState();
+      syncNotesUiFromState();
+      renderAll();
+      updateStorageStatus(true);
     }
 
     function renderCalendar(){
@@ -1984,7 +2006,7 @@ todoActiveList.appendChild(item);
           state = normalizeLoadedState(obj);
           state.updatedAt = new Date().toISOString();
 
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          localStorage.setItem(getActiveStorageKey(), JSON.stringify(state));
           syncNotesUiFromState();
 
           renderAll();
@@ -2003,7 +2025,7 @@ todoActiveList.appendChild(item);
     function resetAll(){
       exportJSON();
       state = defaultState();
-      try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+      try{ localStorage.setItem(getActiveStorageKey(), JSON.stringify(state)); }catch(e){}
       syncNotesUiFromState();
       var now = new Date();
       currentYear = now.getFullYear();
@@ -2524,18 +2546,21 @@ if (window.netlifyIdentity) {
     window.netlifyIdentity.on("init", function(user){
     refreshLoginBtn();
     renderAccountModal();
+    switchStateForCurrentSession();
     if(user) scheduleRemoteRefresh(true);
   });
 
   window.netlifyIdentity.on("login", function(){
     refreshLoginBtn();
     renderAccountModal();
+    switchStateForCurrentSession();
     scheduleRemoteRefresh(true);
   });
 
   window.netlifyIdentity.on("logout", function(){
     refreshLoginBtn();
     renderAccountModal();
+    switchStateForCurrentSession();
   });
   window.netlifyIdentity.on("error", function(err){
     var msg = (err && ((err.json && err.json.error_description) || err.message)) || "Operazione non riuscita.";
