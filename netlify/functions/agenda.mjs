@@ -1,4 +1,5 @@
 import { getStore } from "@netlify/blobs";
+import { getUser } from "@netlify/identity";
 
 function safeKey(s) {
   return String(s || "").replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -24,7 +25,7 @@ function getIdentityUserFromContext(context) {
 }
 
 export default async (req, context) => {
-  const user = getIdentityUserFromContext(context);
+  const user = (await getUser().catch(() => null)) || getIdentityUserFromContext(context);
   if (!user) return new Response("Unauthorized", { status: 401 });
 
   const store = getStore("agenda-ale");
