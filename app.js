@@ -268,10 +268,24 @@
       }
     }
 
+    async function getIdentityAuthHeaders(){
+      try{
+        var user = window.netlifyIdentity && window.netlifyIdentity.currentUser && window.netlifyIdentity.currentUser();
+        if(!user || !user.jwt) return {};
+        var token = await user.jwt();
+        if(!token) return {};
+        return { Authorization: "Bearer " + token };
+      }catch(e){
+        return {};
+      }
+    }
+
     async function loadRemoteState(){
+      var authHeaders = await getIdentityAuthHeaders();
       var res = await fetch("/api/agenda", {
         method:"GET",
-        credentials:"same-origin"
+        credentials:"same-origin",
+        headers: authHeaders
       });
       if(res.status === 401) return null;
       if(!res.ok) throw new Error("Remote load failed");
@@ -280,10 +294,14 @@
     }
 
     async function saveRemoteState(payload){
+      var authHeaders = await getIdentityAuthHeaders();
       var res = await fetch("/api/agenda", {
         method:"PUT",
         credentials:"same-origin",
-        headers: { "content-type":"application/json" },
+        headers: Object.assign(
+          { "content-type":"application/json" },
+          authHeaders
+        ),
         body: JSON.stringify(payload)
       });
       if(res.status === 401) return;
@@ -2386,7 +2404,7 @@ function handleAccountLogin(){
     setAccountMessage("Accesso effettuato.", "success");
     renderAccountModal();
     refreshLoginBtn();
-    syncFromCloudOrSeed();
+    scheduleRemoteRefresh(true);
   }).catch(function(error){
     var msg = (error && ((error.json && error.json.error_description) || error.message)) || "Accesso non riuscito.";
     setAccountMessage(msg, "error");
