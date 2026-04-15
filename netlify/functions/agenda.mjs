@@ -11,18 +11,39 @@ function json(data, status = 200) {
   });
 }
 
+function getIdentityUserFromContext(context) {
+  try {
+    const rawNetlifyContext = context?.clientContext?.custom?.netlify;
+    if (rawNetlifyContext) {
+      const decoded = JSON.parse(Buffer.from(rawNetlifyContext, "base64").toString("utf-8"));
+      if (decoded && decoded.user) return decoded.user;
+    }
+  } catch (e) {}
+
+  return context?.clientContext?.user || null;
+}
+
 export default async (req, context) => {
-  const user = context?.clientContext?.user || null;
+  const user = getIdentityUserFromContext(context);
   if (!user) return new Response("Unauthorized", { status: 401 });
 
-  const store = getStore({ name: "agenda-ale", consistency: "strong" });
+  const store = getStore("agenda-ale");
   const who = safeKey(user.sub || user.id || user.email || "user");
   const key = `state-v1-${who}`;
 
   try {
     if (req.method === "GET") {
-      const data = await store.get(key, { type: "json" });
-      return json({ ok: true, data: data ?? null, key, email: user.email || null });
+      const data = await store.get(key, {
+        type: "json",
+        consistency: "strong"
+      });
+
+      return json({
+        ok: true,
+        data: data ?? null,
+        key,
+        email: user.email || null
+      });
     }
 
     if (req.method === "PUT") {
@@ -38,6 +59,7 @@ export default async (req, context) => {
       }
 
       payload.updatedAt = new Date().toISOString();
+
       await store.setJSON(key, payload);
 
       await store.setJSON("owner-meta", {
